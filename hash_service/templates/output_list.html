@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Обработанные файлы</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 40px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .back-link {
+            display: inline-block;
+            color: #667eea;
+            text-decoration: none;
+            margin-bottom: 20px;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .files-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .files-table th {
+            background: #f5f7ff;
+            color: #667eea;
+            font-weight: 600;
+            text-align: left;
+            padding: 15px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .files-table td {
+            padding: 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .files-table tr:hover {
+            background: #fafbff;
+        }
+        .file-name {
+            color: #333;
+            font-weight: 500;
+        }
+        .file-size {
+            color: #666;
+            font-size: 13px;
+        }
+        .download-btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-size: 13px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #888;
+        }
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        .home-btn {
+            display: inline-block;
+            background: transparent;
+            color: #667eea;
+            border: 2px solid #667eea;
+            padding: 10px 25px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            margin-top: 20px;
+            transition: all 0.2s ease;
+        }
+        .home-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Вернуться на главную</a>
+        
+        <h1>📂 Обработанные файлы</h1>
+        <p class="subtitle">Результаты вычисления хэш-функций и аннотаций</p>
+
+        {% if files %}
+            <table class="files-table">
+                <thead>
+                    <tr>
+                        <th>Имя файла</th>
+                        <th>Размер</th>
+                        <th>Действие</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for file in files %}
+                        <tr>
+                            <td>
+                                <span class="file-name">{{ file.name }}</span>
+                            </td>
+                            <td>
+                                <span class="file-size">{{ (file.size / 1024)|round(2) }} KB</span>
+                            </td>
+                            <td>
+                                <a href="{{ file.url }}" class="download-btn">📥 Скачать</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">📭</div>
+                <h3>Нет обработанных файлов</h3>
+                <p>Загрузите документ для обработки, и результаты появятся здесь</p>
+                <a href="/" class="home-btn">Загрузить файл</a>
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>
