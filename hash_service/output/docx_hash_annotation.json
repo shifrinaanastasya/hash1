@@ -1,9 +1,8 @@
 {
-  "hash": "c1f5e42ca2c61b72f8d78a689b7a364178550de2ef77e459c3ed1696bb448172",
-  "datetime_msk": "2026-06-02 11:19:10 MSK+0300",
-  "annotation": "Извлечение аннотации не поддерживается для файлов ''. В настоящее время поддерживаются только .docx, .txt, .pdf и .rtf.",
-  "annotation_length_chars": 119,
-  "annotation_sentences": 2,
-  "total_weight_bytes": 231,
-  "filename": "docx"
+  "filename": "docx",
+  "hash": "b44261898d042a3281d6b89e963b2055d34ccd3707836ba4cc84d723a10d8343",
+  "date": "2026-06-02 11:54:23 MSK+0300",
+  "annotation": "Формат '' не поддерживается.",
+  "total_weight_bytes": 82,
+  "annotation_length_chars": 28
 }
