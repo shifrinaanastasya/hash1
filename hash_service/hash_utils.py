@@ -2,11 +2,12 @@ import hashlib
 import datetime
 import os
 import re
+import json
 import pytz
 import nltk
 from nltk.tokenize import sent_tokenize
 
-# Попытка загрузки токенизатора при импорте (на случай если не загрузился при старте app)
+# Попытка загрузки токенизатора при импорте
 try:
     nltk.data.find('tokenizers/punkt')
 except LookupError:
@@ -14,7 +15,7 @@ except LookupError:
         nltk.download('punkt', quiet=True)
         nltk.download('punkt_tab', quiet=True)
     except Exception:
-        pass # Игнорируем ошибки загрузки в фоне, попробуем позже
+        pass
 
 # Импорт библиотек для работы с форматами
 try:
@@ -56,26 +57,25 @@ def _is_metadata_line(line):
     
     # Паттерны служебной информации
     patterns = [
-        r'^\d{4}', # Начинается с года (например, 2023)
+        r'^\d{4}', # Начинается с года
         r'^удк\s', r'^doi:\s?', r'^isbn', r'^issn',
         r'^©', r'^все права защищены',
-        r'^аннотация:', r'^abstract:', # Заголовки секций
+        r'^аннотация:', r'^abstract:', 
         r'^ключевые слова:', r'^keywords:',
         r'^автор(ы)?[:\.]', r'^author(s)?[:\.]',
         r'^редактор', r'^editor',
         r'^журнал', r'^journal', r'^вестник', r'^bulletin',
         r'^выпуск', r'^issue', r'^том', r'^vol',
-        r'^стр\.', r'^p\.', r'^с\.\s*\d', # Страницы
-        r'^http', r'^www\.', # Ссылки
-        r'^@', r'^email', r'^e-mail', # Контакты
-        r'^г\.\s*москва', r'^г\.\s*санкт-петербург', # Города издания
+        r'^стр\.', r'^p\.', r'^с\.\s*\d',
+        r'^http', r'^www\.',
+        r'^@', r'^email', r'^e-mail',
+        r'^г\.\s*москва', r'^г\.\s*санкт-петербург',
         r'^издательство', r'^publisher',
         r'^лицензия', r'^license',
         r'^статья получена', r'^received', r'^принята к печати', r'^accepted'
     ]
     
-    # Проверка на список авторов (часто через запятую или точки с инициалами)
-    # Пример: "Иванов И.И., Петров П.П."
+    # Проверка на список авторов
     if re.match(r'^([А-ЯЁ][а-яё]+\s+[А-ЯЁ]\.[А-ЯЁ]?\.?\s*,?\s*)+', line_lower):
         return True
         
@@ -85,7 +85,6 @@ def _is_metadata_line(line):
             
     # Если строка слишком короткая и похожа на заголовок или имя
     if len(line) < 15 and not any(c in line for c in '.!?'):
-        # Исключаем короткие осмысленные фразы, но отлавливаем имена/названия
         if re.match(r'^[А-ЯЁ][а-яё]+(\s+[А-ЯЁ][а-яё]+)*$', line):
             return True
 
@@ -95,7 +94,6 @@ def calculate_sha256(filepath):
     """Вычисляет SHA256 хэш файла."""
     sha256_hash = hashlib.sha256()
     try:
-        # Открываем строго в бинарном режиме
         with open(filepath, "rb") as f:
             for byte_block in iter(lambda: f.read(4096), b""):
                 sha256_hash.update(byte_block)
@@ -107,13 +105,13 @@ def calculate_sha256(filepath):
 
 def get_annotation(filepath):
     """
-    Извлекает аннотацию (первый информативный абзац) из документа.
+    Извлекает аннотацию (первый информативный абзац) из документа по пути.
     Поддерживаются файлы .docx, .txt, .pdf и .rtf.
     Корректно работает с путями на кириллице.
     """
     file_extension = os.path.splitext(filepath)[1].lower()
     
-    # Нормализация пути для Windows (на всякий случай)
+    # Нормализация пути для Windows
     if os.name == 'nt':
         filepath = os.path.normpath(filepath)
 
@@ -132,7 +130,6 @@ def get_annotation(filepath):
             
     elif file_extension == '.txt':
         try:
-            # Пробуем разные кодировки для поддержки кириллицы
             encodings = ['utf-8', 'cp1251', 'latin-1']
             content = None
             for enc in encodings:
@@ -160,17 +157,14 @@ def get_annotation(filepath):
         try:
             reader = PdfReader(filepath)
             full_text = ""
-            # Читаем первые 5 страниц для поиска аннотации
             for i in range(min(len(reader.pages), 5)):
                 page_text = reader.pages[i].extract_text()
                 if page_text:
                     full_text += page_text + "\n\n"
             
-            # Разбиваем на строки/абзацы
             lines = full_text.split('\n')
             for line in lines:
                 text = line.strip()
-                # Фильтруем мусор PDF (одиночные буквы, номера страниц)
                 if len(text) < 20:
                     continue
                 if text.isdigit():
@@ -200,49 +194,28 @@ def get_annotation(filepath):
     else:
         return f"Формат '{file_extension}' не поддерживается."
 
-def process_document(file_storage, output_folder="output"):
+def process_document(filepath, output_folder="output"):
     """
-    Основная функция обработки загруженного файла.
-    Сохраняет файл, вычисляет хэш, получает аннотацию и сохраняет результат.
+    Основная функция обработки файла по пути.
     
     Args:
-        file_storage: объект FileStorage из Flask request.files
-        output_folder: папка для сохранения результатов
+        filepath: Путь к сохраненному файлу (строка)
+        output_folder: Папка для сохранения результатов
         
     Returns:
         dict: результаты обработки или ошибка
     """
-    if not file_storage or file_storage.filename == '':
-        return {"error": "Файл не выбран"}
+    if not filepath or not os.path.exists(filepath):
+        return {"error": "Файл не найден или путь не указан"}
 
-    original_filename = file_storage.filename
+    original_filename = os.path.basename(filepath)
+    base_name = os.path.splitext(original_filename)[0]
     
-    # Безопасное сохранение имени файла (поддержка кириллицы)
-    # werkzeug.utils.secure_filename может обрезать кириллицу, поэтому делаем аккуратно
-    safe_filename = "".join(c for c in original_filename if c.isalnum() or c in ('.', '-', '_', ' ')).rstrip()
-    if not safe_filename:
-        safe_filename = "uploaded_file" + os.path.splitext(original_filename)[1]
-    
-    # Создаем уникальное имя, если файл уже есть, чтобы не перезаписать
-    base_name, ext = os.path.splitext(safe_filename)
-    counter = 1
-    upload_path = os.path.join("uploads", safe_filename)
-    
-    os.makedirs("uploads", exist_ok=True)
     os.makedirs(output_folder, exist_ok=True)
-    
-    final_upload_path = upload_path
-    while os.path.exists(final_upload_path):
-        new_name = f"{base_name}_{counter}{ext}"
-        final_upload_path = os.path.join("uploads", new_name)
-        counter += 1
-
-    # Сохраняем файл
-    file_storage.save(final_upload_path)
     
     try:
         # 1. Вычисляем хэш
-        doc_hash = calculate_sha256(final_upload_path)
+        doc_hash = calculate_sha256(filepath)
         
         # 2. Получаем дату и время (МСК)
         moscow_tz = pytz.timezone('Europe/Moscow')
@@ -250,9 +223,15 @@ def process_document(file_storage, output_folder="output"):
         date_str = now_msk.strftime("%Y-%m-%d %H:%M:%S %Z%z")
         
         # 3. Получаем аннотацию
-        annotation = get_annotation(final_upload_path)
+        annotation = get_annotation(filepath)
         
-        # 4. Считаем вес
+        # 4. Считаем количество предложений
+        try:
+            sentences_count = len(sent_tokenize(annotation, language='russian')) if annotation else 0
+        except:
+            sentences_count = 0
+            
+        # 5. Считаем вес
         hash_bytes = len(doc_hash) // 2
         annotation_bytes = len(annotation.encode('utf-8')) if annotation else 0
         total_weight = hash_bytes + annotation_bytes
@@ -260,24 +239,25 @@ def process_document(file_storage, output_folder="output"):
         result = {
             "filename": original_filename,
             "hash": doc_hash,
-            "date_msk": date_str,
+            "datetime_msk": date_str,
             "annotation": annotation,
             "annotation_length_chars": len(annotation) if annotation else 0,
+            "annotation_sentences": sentences_count,
             "total_weight_bytes": total_weight,
             "processed_at": now_msk.isoformat()
         }
         
         # Сохраняем результат в JSON
-        import json
         result_filename = f"{base_name}_result.json"
-        # Используем безопасное имя для результата
         result_path = os.path.join(output_folder, result_filename)
         
         with open(result_path, 'w', encoding='utf-8') as f:
-            json.dump(result, f, ensure_ascii=False, indent=4)
+            json.dump(result, f, ensure_ascii=False, indent=2)
             
-        # Сохраняем результат в TXT (для удобства чтения)
-        txt_path = os.path.join(output_folder, f"{base_name}_result.txt")
+        # Сохраняем результат в TXT
+        txt_filename = f"{base_name}_result.txt"
+        txt_path = os.path.join(output_folder, txt_filename)
+        
         with open(txt_path, 'w', encoding='utf-8') as f:
             f.write(f"Файл: {original_filename}\n")
             f.write(f"Дата обработки (МСК): {date_str}\n")
@@ -291,8 +271,3 @@ def process_document(file_storage, output_folder="output"):
         
     except Exception as e:
         return {"error": str(e)}
-    finally:
-        # Опционально: можно удалять загруженный файл после обработки
-        # if os.path.exists(final_upload_path):
-        #     os.remove(final_upload_path)
-        pass
