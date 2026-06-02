@@ -1,0 +1,12 @@
+Файл: COMPUTING_SYSTEMS_AND_THEIR_ELEMENTS.pdf
+SHA256 Хэш: 6e7459c5196a1d51b3e6fa91bc8f39eb8527bdbb843c3b84e0becb0117a506d1
+Дата вычисления (МСК): 2026-06-02 12:10:36 MSK+0300
+
+Аннотация документа:
+is himself a biological ecosystem governed by the overarching laws of nature. Formulating its mathematical model and
+
+--- Дополнительная информация об аннотации ---
+Длина аннотации: 116 символов
+Количество предложений в аннотации: 2
+
+Общий вес (хэш + аннотация): 148 байт

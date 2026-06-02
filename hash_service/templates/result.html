@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Результат обработки - {{ result.filename }}</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+        .success-badge {
+            display: inline-block;
+            background: #0a0;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        .filename {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        .result-section {
+            background: #f8f9ff;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .result-label {
+            color: #667eea;
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .result-value {
+            color: #333;
+            font-size: 16px;
+            line-height: 1.6;
+            word-break: break-all;
+        }
+        .hash-value {
+            font-family: 'Courier New', monospace;
+            background: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #e0e0e0;
+            font-size: 14px;
+        }
+        .annotation-value {
+            background: #fff;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #e0e0e0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .stat-label {
+            font-size: 13px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            flex: 1;
+            min-width: 200px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            text-align: center;
+            font-weight: 600;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        .btn-home {
+            background: transparent;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+        @media (max-width: 600px) {
+            .actions {
+                flex-direction: column;
+            }
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✅ Результат обработки</h1>
+        <div style="text-align: center;">
+            <span class="success-badge">Успешно</span>
+        </div>
+        <p class="filename">{{ result.filename }}</p>
+
+        <div class="result-section">
+            <div class="result-label">SHA256 Хэш</div>
+            <div class="result-value hash-value">{{ result.hash }}</div>
+        </div>
+
+        <div class="result-section">
+            <div class="result-label">Дата вычисления (МСК)</div>
+            <div class="result-value">{{ result.datetime_msk }}</div>
+        </div>
+
+        <div class="result-section">
+            <div class="result-label">Аннотация документа</div>
+            <div class="result-value annotation-value">{{ result.annotation }}</div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">{{ result.annotation_length_chars }}</div>
+                <div class="stat-label">Символов в аннотации</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ result.annotation_sentences }}</div>
+                <div class="stat-label">Предложений</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ result.total_weight_bytes }}</div>
+                <div class="stat-label">Общий вес (байт)</div>
+            </div>
+        </div>
+
+        <div class="actions">
+            <a href="/" class="btn btn-home">← Загрузить ещё один файл</a>
+            <a href="/output/{{ output_json }}" class="btn btn-primary">📥 Скачать JSON</a>
+            <a href="/output/{{ output_txt }}" class="btn btn-secondary">📄 Скачать TXT</a>
+        </div>
+
+        <div style="text-align: center; margin-top: 20px;">
+            <a href="/output" style="color: #667eea; text-decoration: none;">📂 Посмотреть все обработанные файлы →</a>
+        </div>
+    </div>
+</body>
+</html>
