@@ -6,16 +6,15 @@ import re
 import nltk
 from nltk.tokenize import sent_tokenize
 
-# Проверка и загрузка ресурсов NLTK при импорте модуля
+# Попытка загрузки токенизатора при импорте модуля
 try:
     nltk.data.find('tokenizers/punkt')
 except LookupError:
-    nltk.download('punkt', quiet=True)
-
-try:
-    nltk.data.find('tokenizers/punkt_tab')
-except LookupError:
-    nltk.download('punkt_tab', quiet=True)
+    try:
+        nltk.download('punkt', quiet=True)
+        nltk.download('punkt_tab', quiet=True)
+    except Exception:
+        pass # Игнорируем ошибки загрузки при импорте, попробуем позже
 
 from docx import Document
 from pypdf import PdfReader
@@ -34,144 +33,169 @@ def calculate_sha256(filepath):
     except Exception as e:
         return f"Ошибка при вычислении хэша: {e}"
 
-def _is_meaningful_annotation(text):
-    """
-    Проверяет, является ли текст подходящей аннотацией.
-    Исключает служебную информацию: авторов, издателей, DOI, годы и т.д.
-    """
-    if not text or len(text.strip()) < 20:
+def _has_multiple_sentences(text):
+    """Проверяет, содержит ли текст более одного предложения."""
+    if not text:
         return False
+    try:
+        sentences = sent_tokenize(text, language='russian')
+    except Exception:
+        # Fallback для английского или простого разбиения, если русский не загружен
+        try:
+            sentences = sent_tokenize(text, language='english')
+        except Exception:
+            sentences = re.split(r'[.!?]+', text)
     
-    clean_text = text.strip()
+    meaningful_sentences = [s.strip() for s in sentences if len(s.strip()) > 10]
+    return len(meaningful_sentences) >= 2
+
+def _is_metadata_line(line):
+    """Проверяет, является ли строка служебной информацией (метаданными)."""
+    line = line.strip()
+    if not line:
+        return True
     
-    # Списки стоп-слов и паттернов для отсева служебной информации
-    skip_patterns = [
-        r'^\s*([А-ЯA-Z][а-яa-z]+\s+){1,}[А-ЯA-Z][а-яa-z]+', # ФИО (несколько слов с заглавной)
-        r'^\s*(Аннотация|Abstract|Анотація)', # Заголовки секций
-        r'^\s*(Ключевые слова|Keywords|УДК|DOI|ISBN|ISSN)', # Мета-данные
-        r'^\s*©', # Копирайт
-        r'^\s*\d{4}\s*г\.?', # Год издания в начале
-        r'^\s*[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}', # Email
-        r'^\s*https?://', # Ссылки
-        r'^\s*\[.*\]', # Ссылки в скобках типа [1]
-        r'^\s*(Vol\.|No\.|Том|№)', # Номера томов/выпусков
-        r'^\s*([А-ЯA-Z]\.)+\s*[А-ЯA-Z][а-яa-z]+', # Инициалы + Фамилия
+    # Паттерны для исключения служебных строк
+    patterns = [
+        r'^\d{4}$', # Только год
+        r'^\d{4}-\d{2}-\d{2}$', # Дата
+        r'^(УДК|UDC|DOI|ISBN|ISSN)\s*[:\.]?\s*\S+', # Библиографические индексы
+        r'^https?://', # Ссылки
+        r'^\S+@\S+\.\S+', # Email
+        r'^(\([А-ЯA-Z][а-яa-z]+\s+[А-ЯA-Z][а-яa-z]+\)|[А-ЯA-Z][а-яa-z]+\s+[А-ЯA-Z]\.[А-ЯA-Z]\.)$', # Имена авторов (упрощенно)
+        r'(аспирант|студент|доцент|профессор|кандидат|доктор)', # Ученые степени/звания
+        r'(г\.|город|ул\.|улица|проспект|пер\.|переулок)', # Адреса
+        r'^\d+\.\s+\d+$', # Номера страниц типа "1. 23"
+        r'^\[\d+\]$', # Ссылки вида [1]
+        r'^Vol\.\s*\d+|^No\.\s*\d+|^Issue\s*\d+', # Информация о выпуске журнала
     ]
     
-    for pattern in skip_patterns:
-        if re.search(pattern, clean_text, re.IGNORECASE):
-            return False
+    for pattern in patterns:
+        if re.search(pattern, line, re.IGNORECASE):
+            return True
             
-    # Проверяем наличие хотя бы двух предложений
-    try:
-        sentences = sent_tokenize(clean_text, language='russian')
-        meaningful_sentences = [s for s in sentences if len(s.strip()) > 10]
-        if len(meaningful_sentences) < 2:
-            # Попробуем английский, если русский не сработал (для смешанных текстов)
-            sentences_en = sent_tokenize(clean_text, language='english')
-            if len(sentences_en) < 2:
-                return False
-    except Exception:
-        # Если токенизация не сработала, проверяем просто по точкам
-        if clean_text.count('.') < 1:
-            return False
-            
-    return True
+    # Если строка слишком короткая (менее 15 символов) и не выглядит как начало предложения
+    if len(line) < 15 and not line[0].isupper():
+        return True
+        
+    return False
 
 def get_annotation(filepath):
     """
     Извлекает аннотацию (первый информативный абзац) из документа.
-    Поддерживаются файлы .docx, .txt, .pdf и .rtf.
-    Исправлена работа с кириллическими путями и кодировками.
+    Игнорирует заголовки, авторов, издателей и другую служебную информацию.
     """
-    # Получаем расширение корректно
-    _, file_extension = os.path.splitext(filepath)
-    file_extension = file_extension.lower()
+    file_extension = os.path.splitext(filepath)[1].lower()
+    text_content = ""
 
-    if file_extension == '.docx':
-        try:
+    try:
+        if file_extension == '.docx':
             doc = Document(filepath)
-            for paragraph in doc.paragraphs:
-                text = paragraph.text.strip()
-                if _is_meaningful_annotation(text):
-                    return text
-            return "В документе .docx не найдено подходящей аннотации."
-        except Exception as e:
-            return f"Ошибка при чтении .docx: {str(e)}"
-            
-    elif file_extension == '.txt':
-        try:
-            # Пробуем разные кодировки для поддержки кириллицы
-            encodings = ['utf-8', 'cp1251', 'latin-1']
-            content = ""
+            paragraphs = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+            # Объединяем для поиска, но сохраняем структуру для анализа
+            for paragraph in paragraphs:
+                if not _is_metadata_line(paragraph) and _has_multiple_sentences(paragraph):
+                    return paragraph
+            # Если не нашли по предложениям, вернем первый подходящий блок
+            for paragraph in paragraphs:
+                if not _is_metadata_line(paragraph) and len(paragraph) > 50:
+                    return paragraph
+                    
+        elif file_extension == '.txt':
+            # Пробуем разные кодировки для кириллицы
+            encodings = ['utf-8', 'cp1251', 'utf-8-sig']
             for enc in encodings:
                 try:
                     with open(filepath, 'r', encoding=enc) as f:
-                        content = f.read()
+                        lines = f.readlines()
                     break
                 except UnicodeDecodeError:
                     continue
+            else:
+                return "Не удалось прочитать файл в поддерживаемых кодировках."
             
-            if not content:
-                return "Не удалось определить кодировку файла .txt"
-                
-            lines = content.split('\n')
             for line in lines:
-                text = line.strip()
-                if _is_meaningful_annotation(text):
-                    return text
-            return "В документе .txt не найдено подходящей аннотации."
-        except Exception as e:
-            return f"Ошибка при чтении .txt: {str(e)}"
+                cleaned = line.strip()
+                if not _is_metadata_line(cleaned) and _has_multiple_sentences(cleaned):
+                    return cleaned
+            # Fallback
+            for line in lines:
+                cleaned = line.strip()
+                if not _is_metadata_line(cleaned) and len(cleaned) > 50:
+                    return cleaned
 
-    elif file_extension == '.pdf':
-        try:
+        elif file_extension == '.pdf':
             reader = PdfReader(filepath)
             full_text = ""
-            # Читаем первые 5 страниц для поиска аннотации
-            for i in range(min(len(reader.pages), 5)):
+            # Читаем первые 3 страницы
+            for i in range(min(len(reader.pages), 3)):
                 page_text = reader.pages[i].extract_text()
                 if page_text:
                     full_text += page_text + "\n\n"
             
-            # Разбиваем на абзацы по двойному переносу строки или явно видимым блокам
-            # Иногда в PDF абзацы разделены одиночным \n, но тогда строки короткие
-            blocks = re.split(r'\n\s*\n', full_text)
-            
+            blocks = full_text.split('\n\n')
             for block in blocks:
-                text = block.strip()
-                if _is_meaningful_annotation(text):
-                    return text
+                cleaned = block.strip()
+                # Разбиваем блок на строки, если он многострочный, и проверяем первую значимую
+                if not _is_metadata_line(cleaned) and _has_multiple_sentences(cleaned):
+                    return cleaned
             
-            # Если строгая разбивка не помогла, попробуем по строкам, если они длинные
-            if not blocks:
-                 lines = full_text.split('\n')
-                 for line in lines:
-                     if _is_meaningful_annotation(line):
-                         return line
+            # Попытка найти аннотацию внутри больших блоков
+            for block in blocks:
+                lines = block.split('\n')
+                for line in lines:
+                    cleaned = line.strip()
+                    if not _is_metadata_line(cleaned) and _has_multiple_sentences(cleaned):
+                        return cleaned
 
-            return "В документе .pdf не найдено подходящей аннотации."
-        except Exception as e:
-            return f"Ошибка при чтении .pdf: {str(e)}"
-
-    elif file_extension == '.rtf':
-        try:
+        elif file_extension == '.rtf':
             with open(filepath, 'r', encoding='latin-1', errors='ignore') as f:
                 rtf_content = f.read()
             plain_text = rtf_to_text(rtf_content)
             
-            blocks = re.split(r'\n\s*\n', plain_text)
+            blocks = plain_text.split('\n\n')
             for block in blocks:
-                text = block.strip()
-                if _is_meaningful_annotation(text):
-                    return text
+                cleaned = block.strip()
+                if not _is_metadata_line(cleaned) and _has_multiple_sentences(cleaned):
+                    return cleaned
                     
-            return "В документе .rtf не найдено подходящей аннотации."
-        except Exception as e:
-            return f"Ошибка при чтении .rtf: {str(e)}"
+        else:
+            return f"Формат '{file_extension}' не поддерживается."
+            
+        return "Аннотация не найдена (возможно, структура документа отличается от стандартной)."
+        
+    except Exception as e:
+        return f"Ошибка при обработке файла: {str(e)}"
+
+def process_document(filepath):
+    """
+    Основная функция обработки документа.
+    Возвращает словарь с результатами: хэш, дата, аннотация, вес.
+    """
+    if not os.path.exists(filepath):
+        return {"error": "Файл не найден"}
+
+    # Вычисление хэша
+    doc_hash = calculate_sha256(filepath)
     
-    else:
-        # Здесь была ошибка: если расширение пустое или не распознано
-        if not file_extension:
-            return "Файл не имеет расширения или имя файла повреждено."
-        return f"Извлечение аннотации не поддерживается для файлов '{file_extension}'. Поддерживаются: .docx, .txt, .pdf, .rtf."
+    # Дата и время (МСК)
+    moscow_tz = pytz.timezone('Europe/Moscow')
+    now_msk = datetime.datetime.now(moscow_tz)
+    date_str = now_msk.strftime("%Y-%m-%d %H:%M:%S %Z%z")
+    
+    # Аннотация
+    annotation = get_annotation(filepath)
+    
+    # Расчет веса
+    hash_bytes = len(doc_hash) // 2
+    annotation_bytes = len(annotation.encode('utf-8')) if annotation else 0
+    total_weight = hash_bytes + annotation_bytes
+    
+    return {
+        "filename": os.path.basename(filepath),
+        "hash": doc_hash,
+        "date": date_str,
+        "annotation": annotation,
+        "total_weight_bytes": total_weight,
+        "annotation_length_chars": len(annotation) if annotation else 0
+    }
