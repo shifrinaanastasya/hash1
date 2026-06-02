@@ -1,0 +1,65 @@
+Файл: COMPUTING_SYSTEMS_AND_THEIR_ELEMENTS.pdf
+SHA256 Хэш: 6e7459c5196a1d51b3e6fa91bc8f39eb8527bdbb843c3b84e0becb0117a506d1
+Дата вычисления (МСК): 2026-06-02 11:19:30 MSK+0300
+
+Аннотация документа:
+International Research Journal ▪ № 7 (145) ▪ July
+ВЫЧИСЛИТЕЛЬНЫЕ СИСТЕМЫ И ИХ ЭЛЕМЕНТЫ / COMPUTING SYSTEMS AND THEIR ELEMENTS 
+DOI: https://doi.org/10.60797/IRJ.2024.145.91 
+INDIVIDUAL DIGITAL IMAGE OF A PERSON AS A FACTOR OF CAPITALISATION OF PERSONALITY 
+Research article 
+Gorelik S.L.1, *, Grudinin V .A.2, Ishutina Y.3
+2 ORCID : 000-0003-1291-5286; 1 SoftMaster Ltd, Netanya, Israel 1 LLC "Urban Mobility", Moscow, Russian Federation 2, 3 ITMO University, Saint-Petersburg, Russian Federation 
+* Corresponding author (samgor46[at]gmail.com) 
+Abstract 
+A person, as an individual entity, is the most significant component of a social ecosystem, comprised of communities, and
+is himself a biological ecosystem governed by the overarching laws of nature. Formulating its mathematical model and
+evaluating its "capitalization" within the ecosystem presents a complex task for biology and mathematics. A mathematical
+model of humanity encompasses both biological and social attributes. For instance, factors determining one's knowledge and
+skills, which are demonstrated and honed through continuous education, along with other influences on performance related to
+health. This paper focuses on the research outcomes and methodological developments, as well as software and technological
+solutions, for the creation and utilization of a dynamic Personal Digital Image (PDI) throughout the lifespan. The scope of
+application lies in the economic and managerial domains of production and educational communities, founded on the regular
+monitoring of intellectual and psychophysical indicators.
+Keywords: personal digital image, assessment technology, cross-testing, intellectual indicators, psychophysical indicators,
+educational process, data processing. 
+ИНДИВИДУ АЛЬНЫЙ ЦИФРОВОЙ ИМИДЖ ЧЕЛОВЕКА КАК ФАКТОР КАПИТАЛИЗАЦИИ ЛИЧНОСТИ 
+Научная статья 
+Горелик С.Л.1, *, Грудинин В.А.2, Ишутина Е.3
+2 ORCID : 000-0003-1291-5286; 1 SoftMaster Ltd, Нетания, Израиль 1 ООО "Городская Мобильность", Москва, Российская Федерация 2, 3 Университет ИТМО, Санкт-Петербург, Российская Федерация 
+* Корреспондирующий автор (samgor46[at]gmail.com) 
+Аннотация 
+Человек, как индивидуальный объект, важнейшая часть социальной экосистемы (состоящей, в свою очередь, из
+сообществ)  и  сам  является  биологической  экосистемой,  управляемой  на  основании  общих  законов  природы.
+Формирование его математической модели и оценка «капитализации» в экосистеме – это комплексная задача биологии
+и математики. Математическая модель человека включает в себя его биологические и социальные характеристики. К
+примеру,  факторы,  определяющие  его  знания  и  навыки,  проявляемые  и  развиваемые  в  процессе  непрерывного
+образования,  а  также  другие  факторы,  влияющие  на  работоспособность,  связанные  со  здоровьем.  Результаты
+исследований и разработки методологии и программно-технологических решений для формирования и использования
+динамического  персонального  цифрового  имиджа  (PDI)  в  течение всего  жизненного  цикла  –  предмет  настоящей
+работы. Область применения – экономика и управление производственными и образовательными сообществами на
+основе регулярного мониторинга интеллектуальных и психофизических показателей.
+Ключевые слова:  персональный цифровой имидж, технология оценки, кросс-тестирование, интеллектуальные
+показатели, психофизические показатели, образовательный процесс, обработка данных. 
+Introduction 
+Assessing  individual  capabilities  and  knowledge  is  a  pertinent  scientific  and  practical  challenge.  The  concept  of
+intellectual capital was initially broached six decades ago in the works of J. Galbraith. Back then, companies showed little
+concern for the presence or condition of their intellectual assets, but by the 1980s, the landscape began shifting due to external
+pressures, prompting them to seek new competitive edges. Intellectual capital emerged as a strategic resource, enabling firms
+to establish enduring value (Kristandl, 2007). By the 2010s, the issue was clearly defined, and methodologies for addressing it
+began to surface (Mondal, 2012; Dumay, 2013). Intellectual property, in its typical form, encompasses patents, licenses,
+copyrights,  etc.  Infrastructural  assets  encompass  those  elements  facilitating  organizational  processes,  employee
+communication, and departmental operations, including corporate culture and databases. It's crucial to devise methods for
+evaluating human capital dynamically rather than solely relying on formal attributes, given that learning and development
+persist throughout an individual's entire lifespan in the contemporary world.
+The  modern  theory  of  human  capital  possesses  a  robust  toolkit  for  assessing  its  development  across  all  stages  of
+reproduction. The systematization presented in [1] enables the identification of several key approaches to measuring human
+capital, including:
+1) measurement using natural indicators (representative estimates);
+1
+
+--- Дополнительная информация об аннотации ---
+Длина аннотации: 4959 символов
+Количество предложений в аннотации: 24
+
+Общий вес (хэш + аннотация): 6319 байт

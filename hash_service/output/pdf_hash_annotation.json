@@ -1,0 +1,9 @@
+{
+  "hash": "a21d3f77223b5b8ff7939f1458311fbc4967513d5a765564ffb0cdc0caa0276f",
+  "datetime_msk": "2026-06-02 11:19:53 MSK+0300",
+  "annotation": "Извлечение аннотации не поддерживается для файлов ''. В настоящее время поддерживаются только .docx, .txt, .pdf и .rtf.",
+  "annotation_length_chars": 119,
+  "annotation_sentences": 2,
+  "total_weight_bytes": 231,
+  "filename": "pdf"
+}
