@@ -1,0 +1,7 @@
+Файл: Method_for_assessing_the_influence_of_psychophysical_state_of.pdf
+Дата обработки (МСК): 2026-06-02 12:03:49 MSK+0300
+SHA256 Хэш: 1c182ee9a2bafcbb98be9abc3e8733519e685b5b2fa1b5e69a68852fd8b8a2c2
+Общий вес (хэш + аннотация): 166 байт
+----------------------------------------
+АННОТАЦИЯ:
+process of preliminary testing. For that purpose, a special mobile application is used making it possible to determine the subject’s

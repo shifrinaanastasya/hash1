@@ -1,3 +1,4 @@
+```python
 import hashlib
 import datetime
 import os
@@ -7,17 +8,13 @@ import pytz
 import nltk
 from nltk.tokenize import sent_tokenize
 
-# Попытка загрузки токенизатора при импорте
+# Проверка наличия punkt
 try:
     nltk.data.find('tokenizers/punkt')
 except LookupError:
-    try:
-        nltk.download('punkt', quiet=True)
-        nltk.download('punkt_tab', quiet=True)
-    except Exception:
-        pass
+    nltk.download('punkt', quiet=True)
 
-# Импорт библиотек для работы с форматами
+# Импорт библиотек
 try:
     from docx import Document
 except ImportError:
@@ -33,241 +30,420 @@ try:
 except ImportError:
     rtf_to_text = None
 
-def _has_multiple_sentences(text):
-    """Проверяет, содержит ли текст более одного предложения."""
-    if not text or len(text) < 20:
-        return False
-    try:
-        sentences = sent_tokenize(text, language='russian')
-        meaningful_sentences = [s.strip() for s in sentences if len(s.strip()) > 10]
-        return len(meaningful_sentences) >= 2
-    except Exception:
-        # Фоллбэк, если токенизация не сработала
-        return '.' in text and text.count('.') > 1
-
-def _is_metadata_line(line):
-    """
-    Проверяет, является ли строка служебной информацией (авторы, издательство, DOI и т.д.),
-    а не частью аннотации.
-    """
-    if not line:
-        return True
-    
-    line_lower = line.lower().strip()
-    
-    # Паттерны служебной информации
-    patterns = [
-        r'^\d{4}', # Начинается с года
-        r'^удк\s', r'^doi:\s?', r'^isbn', r'^issn',
-        r'^©', r'^все права защищены',
-        r'^аннотация:', r'^abstract:', 
-        r'^ключевые слова:', r'^keywords:',
-        r'^автор(ы)?[:\.]', r'^author(s)?[:\.]',
-        r'^редактор', r'^editor',
-        r'^журнал', r'^journal', r'^вестник', r'^bulletin',
-        r'^выпуск', r'^issue', r'^том', r'^vol',
-        r'^стр\.', r'^p\.', r'^с\.\s*\d',
-        r'^http', r'^www\.',
-        r'^@', r'^email', r'^e-mail',
-        r'^г\.\s*москва', r'^г\.\s*санкт-петербург',
-        r'^издательство', r'^publisher',
-        r'^лицензия', r'^license',
-        r'^статья получена', r'^received', r'^принята к печати', r'^accepted'
-    ]
-    
-    # Проверка на список авторов
-    if re.match(r'^([А-ЯЁ][а-яё]+\s+[А-ЯЁ]\.[А-ЯЁ]?\.?\s*,?\s*)+', line_lower):
-        return True
-        
-    for pattern in patterns:
-        if re.search(pattern, line_lower):
-            return True
-            
-    # Если строка слишком короткая и похожа на заголовок или имя
-    if len(line) < 15 and not any(c in line for c in '.!?'):
-        if re.match(r'^[А-ЯЁ][а-яё]+(\s+[А-ЯЁ][а-яё]+)*$', line):
-            return True
-
-    return False
 
 def calculate_sha256(filepath):
     """Вычисляет SHA256 хэш файла."""
     sha256_hash = hashlib.sha256()
+
+    with open(filepath, "rb") as f:
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+
+    return sha256_hash.hexdigest()
+
+
+def detect_language(text):
+    """
+    Определяет язык текста.
+    """
+    if re.search(r'[а-яА-ЯёЁ]', text):
+        return 'russian'
+    return 'english'
+
+
+def has_multiple_sentences(text):
+    """
+    Проверяет наличие минимум двух предложений.
+    """
+    if not text:
+        return False
+
+    text = text.strip()
+
+    if len(text) < 50:
+        return False
+
     try:
-        with open(filepath, "rb") as f:
-            for byte_block in iter(lambda: f.read(4096), b""):
-                sha256_hash.update(byte_block)
-        return sha256_hash.hexdigest()
-    except FileNotFoundError:
-        return "Файл не найден"
-    except Exception as e:
-        return f"Ошибка при вычислении хэша: {e}"
+        lang = detect_language(text)
+
+        sentences = sent_tokenize(text, language=lang)
+
+        meaningful = [
+            s.strip()
+            for s in sentences
+            if len(s.strip()) > 10
+        ]
+
+        return len(meaningful) >= 2
+
+    except Exception:
+        punctuation_count = len(
+            re.findall(r'[.!?]', text)
+        )
+
+        return punctuation_count >= 2
+
+
+def clean_text(text):
+    """
+    Очистка текста.
+    """
+    if not text:
+        return ""
+
+    text = text.replace('\xa0', ' ')
+    text = re.sub(r'\s+', ' ', text)
+
+    return text.strip()
+
+
+def is_bad_block(text):
+    """
+    Отсеивает служебные блоки.
+    """
+    if not text:
+        return True
+
+    text_lower = text.lower().strip()
+
+    bad_patterns = [
+        r'^doi',
+        r'^udk',
+        r'^удк',
+        r'^issn',
+        r'^isbn',
+        r'^keywords',
+        r'^ключевые слова',
+        r'^references',
+        r'^список литературы',
+        r'^author',
+        r'^автор',
+        r'^journal',
+        r'^журнал',
+        r'^abstract$',
+        r'^аннотация$',
+        r'^introduction$',
+        r'^введение$'
+    ]
+
+    for pattern in bad_patterns:
+        if re.search(pattern, text_lower):
+            return True
+
+    return False
+
+
+def split_into_blocks(text):
+    """
+    Разбивает текст на абзацы.
+    """
+    blocks = re.split(r'\n\s*\n', text)
+
+    cleaned_blocks = []
+
+    for block in blocks:
+        block = clean_text(block)
+
+        if block:
+            cleaned_blocks.append(block)
+
+    return cleaned_blocks
+
+
+def find_annotation(blocks):
+    """
+    Ищет первый информативный абзац.
+    """
+
+    for i, block in enumerate(blocks):
+
+        if is_bad_block(block):
+            continue
+
+        if has_multiple_sentences(block):
+            return block
+
+        # Если встретили "Аннотация" или "Abstract",
+        # берем следующий содержательный блок
+        lower = block.lower().strip()
+
+        if lower in ['abstract', 'аннотация']:
+
+            for next_block in blocks[i + 1:]:
+
+                if (
+                    not is_bad_block(next_block)
+                    and has_multiple_sentences(next_block)
+                ):
+                    return next_block
+
+    return "Аннотация не найдена."
+
+
+def extract_text_from_docx(filepath):
+    doc = Document(filepath)
+
+    paragraphs = []
+
+    for p in doc.paragraphs:
+        text = clean_text(p.text)
+
+        if text:
+            paragraphs.append(text)
+
+    return '\n\n'.join(paragraphs)
+
+
+def extract_text_from_txt(filepath):
+
+    encodings = [
+        'utf-8',
+        'cp1251',
+        'windows-1251',
+        'latin-1'
+    ]
+
+    for enc in encodings:
+
+        try:
+            with open(filepath, 'r', encoding=enc) as f:
+                return f.read()
+
+        except UnicodeDecodeError:
+            continue
+
+    raise Exception("Не удалось определить кодировку TXT файла")
+
+
+def extract_text_from_pdf(filepath):
+
+    reader = PdfReader(filepath)
+
+    text = ""
+
+    pages_to_read = min(5, len(reader.pages))
+
+    for i in range(pages_to_read):
+
+        page = reader.pages[i]
+
+        page_text = page.extract_text()
+
+        if page_text:
+            text += page_text + "\n\n"
+
+    return text
+
+
+def extract_text_from_rtf(filepath):
+
+    with open(
+        filepath,
+        'r',
+        encoding='latin-1',
+        errors='ignore'
+    ) as f:
+
+        rtf_content = f.read()
+
+    return rtf_to_text(rtf_content)
+
 
 def get_annotation(filepath):
     """
-    Извлекает аннотацию (первый информативный абзац) из документа по пути.
-    Поддерживаются файлы .docx, .txt, .pdf и .rtf.
-    Корректно работает с путями на кириллице.
+    Извлекает аннотацию из документа.
     """
-    file_extension = os.path.splitext(filepath)[1].lower()
-    
-    # Нормализация пути для Windows
+
+    extension = os.path.splitext(filepath)[1].lower()
+
     if os.name == 'nt':
         filepath = os.path.normpath(filepath)
 
-    if file_extension == '.docx':
-        if Document is None:
-            return "Библиотека python-docx не установлена."
-        try:
-            doc = Document(filepath)
-            for paragraph in doc.paragraphs:
-                text = paragraph.text.strip()
-                if text and not _is_metadata_line(text) and _has_multiple_sentences(text):
-                    return text
-            return "В документе .docx не найдено подходящей аннотации."
-        except Exception as e:
-            return f"Ошибка при чтении .docx: {e}"
-            
-    elif file_extension == '.txt':
-        try:
-            encodings = ['utf-8', 'cp1251', 'latin-1']
-            content = None
-            for enc in encodings:
-                try:
-                    with open(filepath, 'r', encoding=enc) as f:
-                        content = f.readlines()
-                    break
-                except UnicodeDecodeError:
-                    continue
-            
-            if content is None:
-                return "Не удалось определить кодировку файла."
+    try:
 
-            for line in content:
-                text = line.strip()
-                if text and not _is_metadata_line(text) and _has_multiple_sentences(text):
-                    return text
-            return "В документе .txt не найдено подходящей аннотации."
-        except Exception as e:
-            return f"Ошибка при чтении .txt: {e}"
-            
-    elif file_extension == '.pdf':
-        if PdfReader is None:
-            return "Библиотека pypdf не установлена."
-        try:
-            reader = PdfReader(filepath)
-            full_text = ""
-            for i in range(min(len(reader.pages), 5)):
-                page_text = reader.pages[i].extract_text()
-                if page_text:
-                    full_text += page_text + "\n\n"
-            
-            lines = full_text.split('\n')
-            for line in lines:
-                text = line.strip()
-                if len(text) < 20:
-                    continue
-                if text.isdigit():
-                    continue
-                if not _is_metadata_line(text) and _has_multiple_sentences(text):
-                    return text
-            return "В документе .pdf не найдено подходящей аннотации."
-        except Exception as e:
-            return f"Ошибка при чтении .pdf: {e}"
-            
-    elif file_extension == '.rtf':
-        if rtf_to_text is None:
-            return "Библиотека striprtf не установлена."
-        try:
-            with open(filepath, 'r', encoding='latin-1', errors='ignore') as f:
-                rtf_content = f.read()
-            plain_text = rtf_to_text(rtf_content)
-            
-            blocks = plain_text.split('\n')
-            for block in blocks:
-                text = block.strip()
-                if text and not _is_metadata_line(text) and _has_multiple_sentences(text):
-                    return text
-            return "В документе .rtf не найдено подходящей аннотации."
-        except Exception as e:
-            return f"Ошибка при чтении .rtf: {e}"
-    else:
-        return f"Формат '{file_extension}' не поддерживается."
+        if extension == '.docx':
+
+            if Document is None:
+                return "python-docx не установлен"
+
+            text = extract_text_from_docx(filepath)
+
+        elif extension == '.txt':
+
+            text = extract_text_from_txt(filepath)
+
+        elif extension == '.pdf':
+
+            if PdfReader is None:
+                return "pypdf не установлен"
+
+            text = extract_text_from_pdf(filepath)
+
+        elif extension == '.rtf':
+
+            if rtf_to_text is None:
+                return "striprtf не установлен"
+
+            text = extract_text_from_rtf(filepath)
+
+        else:
+            return f"Формат {extension} не поддерживается"
+
+        blocks = split_into_blocks(text)
+
+        annotation = find_annotation(blocks)
+
+        return annotation
+
+    except Exception as e:
+        return f"Ошибка извлечения аннотации: {e}"
+
 
 def process_document(filepath, output_folder="output"):
     """
-    Основная функция обработки файла по пути.
-    
-    Args:
-        filepath: Путь к сохраненному файлу (строка)
-        output_folder: Папка для сохранения результатов
-        
-    Returns:
-        dict: результаты обработки или ошибка
+    Основная функция обработки документа.
     """
+
     if not filepath or not os.path.exists(filepath):
-        return {"error": "Файл не найден или путь не указан"}
+        return {
+            "error": "Файл не найден"
+        }
 
     original_filename = os.path.basename(filepath)
-    base_name = os.path.splitext(original_filename)[0]
-    
+
+    base_name = os.path.splitext(
+        original_filename
+    )[0]
+
     os.makedirs(output_folder, exist_ok=True)
-    
+
     try:
-        # 1. Вычисляем хэш
+
+        # Хэш
         doc_hash = calculate_sha256(filepath)
-        
-        # 2. Получаем дату и время (МСК)
+
+        # Время МСК
         moscow_tz = pytz.timezone('Europe/Moscow')
-        now_msk = datetime.datetime.now(moscow_tz)
-        date_str = now_msk.strftime("%Y-%m-%d %H:%M:%S %Z%z")
-        
-        # 3. Получаем аннотацию
+
+        now_msk = datetime.datetime.now(
+            moscow_tz
+        )
+
+        date_str = now_msk.strftime(
+            "%Y-%m-%d %H:%M:%S %Z%z"
+        )
+
+        # Аннотация
         annotation = get_annotation(filepath)
-        
-        # 4. Считаем количество предложений
+
+        # Количество предложений
         try:
-            sentences_count = len(sent_tokenize(annotation, language='russian')) if annotation else 0
-        except:
-            sentences_count = 0
-            
-        # 5. Считаем вес
+
+            lang = detect_language(annotation)
+
+            annotation_sentences = len(
+                sent_tokenize(
+                    annotation,
+                    language=lang
+                )
+            )
+
+        except Exception:
+            annotation_sentences = 0
+
+        # Размер
         hash_bytes = len(doc_hash) // 2
-        annotation_bytes = len(annotation.encode('utf-8')) if annotation else 0
-        total_weight = hash_bytes + annotation_bytes
-        
+
+        annotation_bytes = len(
+            annotation.encode('utf-8')
+        )
+
+        total_weight = (
+            hash_bytes +
+            annotation_bytes
+        )
+
         result = {
             "filename": original_filename,
             "hash": doc_hash,
             "datetime_msk": date_str,
             "annotation": annotation,
-            "annotation_length_chars": len(annotation) if annotation else 0,
-            "annotation_sentences": sentences_count,
+            "annotation_length_chars": len(annotation),
+            "annotation_sentences": annotation_sentences,
             "total_weight_bytes": total_weight,
             "processed_at": now_msk.isoformat()
         }
-        
-        # Сохраняем результат в JSON
-        result_filename = f"{base_name}_result.json"
-        result_path = os.path.join(output_folder, result_filename)
-        
-        with open(result_path, 'w', encoding='utf-8') as f:
-            json.dump(result, f, ensure_ascii=False, indent=2)
-            
-        # Сохраняем результат в TXT
-        txt_filename = f"{base_name}_result.txt"
-        txt_path = os.path.join(output_folder, txt_filename)
-        
-        with open(txt_path, 'w', encoding='utf-8') as f:
-            f.write(f"Файл: {original_filename}\n")
-            f.write(f"Дата обработки (МСК): {date_str}\n")
-            f.write(f"SHA256 Хэш: {doc_hash}\n")
-            f.write(f"Общий вес (хэш + аннотация): {total_weight} байт\n")
+
+        # JSON
+        json_filename = (
+            f"{base_name}_result.json"
+        )
+
+        json_path = os.path.join(
+            output_folder,
+            json_filename
+        )
+
+        with open(
+            json_path,
+            'w',
+            encoding='utf-8'
+        ) as f:
+
+            json.dump(
+                result,
+                f,
+                ensure_ascii=False,
+                indent=2
+            )
+
+        # TXT
+        txt_filename = (
+            f"{base_name}_result.txt"
+        )
+
+        txt_path = os.path.join(
+            output_folder,
+            txt_filename
+        )
+
+        with open(
+            txt_path,
+            'w',
+            encoding='utf-8'
+        ) as f:
+
+            f.write(
+                f"Файл: {original_filename}\n"
+            )
+
+            f.write(
+                f"Дата обработки (МСК): "
+                f"{date_str}\n"
+            )
+
+            f.write(
+                f"SHA256 Хэш: "
+                f"{doc_hash}\n"
+            )
+
+            f.write(
+                f"Общий вес "
+                f"(хэш + аннотация): "
+                f"{total_weight} байт\n"
+            )
+
             f.write("-" * 40 + "\n")
+
             f.write("АННОТАЦИЯ:\n")
-            f.write(f"{annotation}\n")
-            
+
+            f.write(annotation)
+
         return result
-        
+
     except Exception as e:
-        return {"error": str(e)}
+
+        return {
+            "error": str(e)
+        }
+```

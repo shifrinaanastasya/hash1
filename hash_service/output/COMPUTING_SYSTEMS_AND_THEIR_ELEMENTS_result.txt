@@ -1,0 +1,7 @@
+Файл: COMPUTING_SYSTEMS_AND_THEIR_ELEMENTS.pdf
+Дата обработки (МСК): 2026-06-02 12:10:36 MSK+0300
+SHA256 Хэш: 6e7459c5196a1d51b3e6fa91bc8f39eb8527bdbb843c3b84e0becb0117a506d1
+Общий вес (хэш + аннотация): 148 байт
+----------------------------------------
+АННОТАЦИЯ:
+is himself a biological ecosystem governed by the overarching laws of nature. Formulating its mathematical model and
